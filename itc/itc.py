@@ -17,7 +17,7 @@
 # Contributors:
 #     Simon Kennedy <code@sffjunkie.co.uk>
 
-__version__ = '0.3'
+__version__ = '0.3.1'
 __author__ = 'Simon Kennedy <code@sffjunkie.co.uk>'
 
 ITUNES_9 = 208

@@ -16,7 +16,7 @@ from os.path import join
 from distutils.core import setup
 
 setup(name='itc',
-    version='0.3',
+    version='0.3.1',
     description='Extracts images from an iTunes .itc file.',
     long_description="""A small script which extracts PNG, JPEG and ARGB
     cover art from an iTunes :file:`.itc` file. """,
