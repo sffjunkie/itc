@@ -314,7 +314,7 @@ class ITCFile(object):
         # TODO: Confirm that downloaded and local images use the same
         # format identifiers
         format_ = ''
-        if iformat == 'PNGf':
+        if iformat == 'PNGf' or iformat == '\x00\x00\x00\x0e':
             format_ = 'PNG'
         elif iformat == '\x00\x00\x00\x0d':
             format_ = 'JPEG'
