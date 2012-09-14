@@ -36,7 +36,7 @@ class ITCException(Exception):
 class ITCWarning(Warning):
     pass
 
-class SimplePNG(object):
+class EasyPNG(object):
     def __init__(self, compression=0):
         self.compression = compression
         self.color_type = enum(greyscale=0, truecolor=2, indexed=3,
@@ -357,7 +357,7 @@ class ITCFile(object):
         if img[3] != 'ARGB':
             fp.write(img[2])
         else:
-            p = SimplePNG()
+            p = EasyPNG()
             p.write(img, fp)
         
         fp.close()
