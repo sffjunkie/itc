@@ -1,0 +1,5 @@
+itc.py
+======
+
+A small script which extracts PNG, JPEG and ARGB
+cover art from an iTunes .itc file.
