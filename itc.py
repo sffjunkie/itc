@@ -18,6 +18,7 @@
 #     Simon Kennedy <code@sffjunkie.co.uk>
 
 __version__ = '0.3'
+__author__ = 'Simon Kennedy <code@sffjunkie.co.uk>'
 
 ITUNES_9 = 208
 ITUNES_OLD = 216
