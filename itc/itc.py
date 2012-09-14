@@ -1,5 +1,3 @@
-#!/usr/bin/python
-#
 # Copyright (c) 2009-2012 Simon Kennedy.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +15,7 @@
 # Contributors:
 #     Simon Kennedy <code@sffjunkie.co.uk>
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 __author__ = 'Simon Kennedy <code@sffjunkie.co.uk>'
 
 ITUNES_9 = 208
