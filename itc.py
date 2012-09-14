@@ -15,13 +15,20 @@
 # limitations under the License.
 
 # Contributors:
-#     Simon Kennedy <python@sffjunkie.co.uk>
+#     Simon Kennedy <code@sffjunkie.co.uk>
 
-__version__ = '0.2'
+__version__ = '0.3'
 
-import os
-import os.path
+ITUNES_9 = 208
+ITUNES_OLD = 216
+
+from array import array
 import struct
+import os.path
+import zlib
+
+def enum(**enums):
+    return type('Enum', (), enums)
 
 class ITCException(Exception):
     pass
@@ -29,8 +36,58 @@ class ITCException(Exception):
 class ITCWarning(Warning):
     pass
 
-ITUNES_9 = 208
-ITUNES_OLD = 216
+class SimplePNG(object):
+    def __init__(self, compression=0):
+        self.compression = compression
+        self.color_type = enum(greyscale=0, truecolor=2, indexed=3,
+                               greyscale_alpha=4, truecolor_alpha=6)
+    
+    def write(self, image, fp):
+        self._writes = fp
+        self._writes.write('\x89\x50\x4e\x47\x0d\x0a\x1a\x0a')
+        self._write_header(image[0], image[1],
+                           8, self.color_type.truecolor_alpha)
+        self._write_argb_data(image[0], image[1], image[2], image[5])
+        self._write_end()
+    
+    def _write_box(self, name, data, length):
+        if length > 0:
+            self._writes.write(struct.pack('!L4s%dsl' % length,
+                length, name, data,
+                zlib.crc32(name+data)))
+        else:
+            self._writes.write(struct.pack('!L4sl', 0, name, zlib.crc32(name)))
+        
+    def _write_header(self, width, height, depth, color_type, compression=0,
+                      filter_=0, interlace=0):
+        data = struct.pack('!IIBBBBB', width, height, depth, color_type,
+                           compression, filter_, interlace)
+        self._write_box('IHDR', data, 13)
+
+    def _write_data(self, data):
+        compress = zlib.compressobj(self.compression)
+        compressed = compress.compress(data.tostring())
+        compressed += compress.flush()
+        length = len(compressed)
+        
+        self._write_box('IDAT', compressed, length)
+    
+    def _write_argb_data(self, width, height, argb_data, length):
+        data = array('B')
+        for y in range(height):
+            data.append(0)
+            for x in range(width):
+                offset = ((y * width) + x) * 4
+                data.append(ord(argb_data[offset+1]))
+                data.append(ord(argb_data[offset+2]))
+                data.append(ord(argb_data[offset+3]))
+                data.append(ord(argb_data[offset]))
+        
+        self._write_data(data)
+        
+    def _write_end(self):
+        self._write_box('IEND', '', 0)
+    
 
 class ITCFile(object):
     def __init__(self, mode=ITUNES_9, quiet=False):
@@ -75,18 +132,19 @@ class ITCFile(object):
         self._rs.close()
         
     def add_image(self, filename, width, height):
-        f, ext = os.path.splitext(filename)
+        _f, ext = os.path.splitext(filename)
         if ext.lower() == '.jpg':
-            format = 'JPG'
+            format_ = 'JPG'
         elif ext.lower() == '.png':
-            format = 'PNG'
+            format_ = 'PNG'
         else:
-            raise ITCException('Unhandled image file extension. Must be either .jpg or .png')
+            raise ITCException(('Unhandled image file extension. Must be '
+                                'either .jpg or .png'))
        
         fp = open(filename, 'rb')
         data = fp.read()
         data_size = fp.tell()
-        info = (width, height, data, format, 'local', data_size)
+        info = (width, height, data, format_, 'local', data_size)
         self.images.append(info)
         fp.close()
 
@@ -98,7 +156,8 @@ class ITCFile(object):
                 raise ITCException('You must supply a filename to write()')
         
         self._ws = open(filename, 'wb')
-        self._ws.write(struct.pack('>L0004sLLLL0004s', 284, 'itch', 2, 2, 2, 0, 'artw'))
+        self._ws.write(struct.pack('!L0004sLLLL0004s', 284, 'itch',
+                                   2, 2, 2, 0, 'artw'))
         self._ws.write('\0' * 256)
         
         for x in range(len(self.images)):
@@ -111,18 +170,22 @@ class ITCFile(object):
         image_data = info[2]
         
         if image_data is None:
-            raise ITCWarning('Image number %02d has no data and will not be written to the file.' % (num+1))
+            raise ITCWarning(('Image number %02d has no data and will not be '
+                              'written to the file.') % (num+1))
     
         width = info[0]
         height = info[1]
         
-        format = info[3]
-        if format == 'PNG':
+        format_ = info[3]
+        if format_ == 'PNG':
             iformat = 'PNGf'
-        elif format == 'JPG':
+        elif format_ == 'JPG':
             iformat = '\x00\x00\x00\x0d'
+        elif format == 'ARGB':
+            iformat = ''
         else:
-            raise ITCException('Invalid format specified (%s) must be either JPG or PNG' % format)
+            raise ITCException(('Invalid format specified (%s) must be either '
+                                'JPG or PNG') % format)
             
         method = info[4]
         if method == 'local':
@@ -135,12 +198,13 @@ class ITCFile(object):
         image_len = info[5]
         size = image_len + self.image_offset
 
-        item_header = struct.pack('>L0004sL', size, 'item', self.image_offset)
+        item_header = struct.pack('!L0004sL', size, 'item', self.image_offset)
         item_header += self.info_preamble
-        item_header += struct.pack('>QQ004s0004s', self.library, self.track,
+        item_header += struct.pack('!QQ004s0004s', self.library, self.track,
             imethod, iformat)
         item_header += '\0' * 4
-        item_header += struct.pack('>LL0003sLL', width, height, '\0' * 3, width, height)
+        item_header += struct.pack('!LL0003sLL', width, height, '\0' * 3,
+                                   width, height)
 
         item_header_len = len(item_header)
 
@@ -164,14 +228,15 @@ class ITCFile(object):
             self._itc_file.images[index][2] = data
             self._itc_file.images[index][5] = len(data)
 
-    def export_image(self, filename, num=1, all=False):
+    def export_image(self, filename, num=1, all_=False):
         if num > len(self.images):
-            raise IndexError('Invalid image number specified (%d). ITC file only contains %d image(s)' % (num, len(self.images)))
+            raise IndexError(('Invalid image number specified (%d). ITC file '
+                'only contains %d image(s)') % (num, len(self.images)))
 
         if num < 1:
             raise IndexError('Image number must be >= 1')
 
-        if all:
+        if all_:
             if not self.quiet:
                 print('Extracting all images from %s' % filename)
                 
@@ -184,11 +249,11 @@ class ITCFile(object):
             self._export_image_data('%s-%02d' % (filename, num), num - 1)
                 
     def _read_frame(self):
-        pos = self._rs.tell()
+        _pos = self._rs.tell()
         
         data = self._rs.read(8)
         if len(data) == 8:
-            size, frame = struct.unpack('>L0004s', data)
+            size, frame = struct.unpack('!L0004s', data)
     
             self._handle_frame(frame, size)
             
@@ -208,7 +273,7 @@ class ITCFile(object):
 
     def _parse_item(self, frame, size):
         start = self._rs.tell()
-        self.image_offset = struct.unpack('>L', self._rs.read(4))[0]
+        self.image_offset = struct.unpack('!L', self._rs.read(4))[0]
 
         # 16 byte preamble for ITUNES_9 & 20 after ITUNES_OLD. 
         # The reason for this unclear.
@@ -219,21 +284,25 @@ class ITCFile(object):
         elif self.image_offset == ITUNES_OLD:
             self.info_preamble = self._rs.read(20)
         
-        library, track, imethod, iformat = struct.unpack('>QQ0004s0004s', self._rs.read(24))
+        library, track, imethod, iformat = struct.unpack('!QQ0004s0004s',
+                                                         self._rs.read(24))
         
         if self.library == '':
             self.library = library
         elif self.library == library:
             pass
         else:
-            raise ITCWarning('Images with multiple library IDs found. Only the first found will be used (%s).' % self.library)
+            raise ITCWarning(('Images with multiple library IDs found. Only '
+                              'the first found will be used '
+                              '(%s).') % self.library)
         
         if self.track == '':
             self.track = track
         elif self.track == track:
             pass
         else:
-            raise ITCWarning('Images with multiple track IDs found. Only the first found will be used (%s).' % self.track)
+            raise ITCWarning(('Images with multiple track IDs found. Only the '
+                              'first found will be used (%s).') % self.track)
         
         method = ''
         if imethod == 'locl':
@@ -243,14 +312,16 @@ class ITCFile(object):
             
         # TODO: Confirm that downloaded and local images use the same
         # format identifiers
-        format = ''
+        format_ = ''
         if iformat == 'PNGf':
-            format = 'PNG'
+            format_ = 'PNG'
         elif iformat == '\x00\x00\x00\x0d':
-            format = 'JPEG'
+            format_ = 'JPEG'
+        elif iformat == 'ARGb':
+            format_ = 'ARGB'
         
         self._rs.seek(4, os.SEEK_CUR)
-        width, height = struct.unpack('>LL', self._rs.read(8))
+        width, height = struct.unpack('!LL', self._rs.read(8))
 
         image_pos = start + self.image_offset - 8
         self._rs.seek(image_pos)
@@ -263,7 +334,7 @@ class ITCFile(object):
         else:
             data = self._rs.read(data_size)
         
-        self.images.append((width, height, data, format, method, data_size))
+        self.images.append((width, height, data, format_, method, data_size))
 
     def _export_image_data(self, filename, num):
         if num < 0:
@@ -272,16 +343,23 @@ class ITCFile(object):
         img = self.images[num]
                 
         if not self.quiet:
-            print('    %02d, width=%d, height=%d, format=%s, location=%s, length=%d' % (num+1, img[0], img[1], img[3], img[4], img[5]))
+            print(('    %02d, width=%d, height=%d, format=%s, location=%s, '
+                'length=%d') % (num+1, img[0], img[1], img[3], img[4], img[5]))
         
         extension = ''
-        if img[3] == 'PNG':
+        if img[3] == 'PNG' or img[3] == 'ARGB':
             extension = '.png'
         elif img[3] == 'JPEG':
             extension = '.jpg'
 
         fp = open('%s%s' % (filename, extension), 'wb')
-        fp.write(img[2])
+        
+        if img[3] != 'ARGB':
+            fp.write(img[2])
+        else:
+            p = SimplePNG()
+            p.write(img, fp)
+        
         fp.close()
 
     def _handle_frame(self, frame, size):
@@ -329,7 +407,9 @@ if __name__ == "__main__":
                     print('ITC File Information for %s' % filename)
                     for x in range(len(itc.images)):
                         img = itc.images[x]
-                        print('    %02d, width=%d, height=%d, format=%s, location=%s, length=%d' % (x+1, img[0], img[1], img[3], img[4], img[5]))
+                        print(('    %02d, width=%d, height=%d, format=%s, '
+                            'location=%s, length=%d') % (x+1, img[0], img[1],
+                            img[3], img[4], img[5]))
 
                 elif options.add != '':
                     if len(files) > 1:
@@ -361,7 +441,7 @@ if __name__ == "__main__":
                         name = options.basename
         
                     if options.number == -1:
-                        itc.export_image(name, all=True)
+                        itc.export_image(name, all_=True)
                     else:
                         try:
                             itc.export_image(name, num=int(options.number))
