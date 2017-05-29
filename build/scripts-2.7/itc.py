@@ -15,7 +15,7 @@
 # Contributors:
 #     Simon Kennedy <code@sffjunkie.co.uk>
 
-__version__ = '0.3.3'
+__version__ = '0.3.2'
 __author__ = 'Simon Kennedy <code@sffjunkie.co.uk>'
 
 ITUNES_9 = 208
@@ -180,7 +180,7 @@ class ITCFile(object):
             iformat = 'PNGf'
         elif format_ == 'JPG':
             iformat = '\x00\x00\x00\x0d'
-        elif format_ == 'ARGB':
+        elif format == 'ARGB':
             iformat = ''
         else:
             raise ITCException(('Invalid format specified (%s) must be either '

@@ -21,8 +21,8 @@ setup(name='itc',
     long_description="""A small script which extracts PNG, JPEG and ARGB
     cover art from an iTunes `.itc` file.""",
     author='Simon Kennedy',
-    author_email='code@sffjunkie.co.uk',
-    url="http://www.sffjunkie.co.uk/python-itc.html",
+    author_email='sffjunkie+code@gmail.com',
+    url="https://github.com/sffjunkie/itc",
     license='Apache-2.0',
     scripts=[join('itc', 'itc.py')],
 )
