@@ -46,6 +46,9 @@ intermediate
 publish
 .idea
 __pycache__
+build
+dist
+*.egg-info
 
 # build script local files
 build/buildinfo.properties
