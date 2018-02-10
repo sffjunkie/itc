@@ -13,10 +13,10 @@
 # limitations under the License.
 
 # Contributors:
-#     Simon Kennedy <code@sffjunkie.co.uk>
+#     Simon Kennedy <sffjunkie+code@gmail.com>
 
 __version__ = '0.3.3'
-__author__ = 'Simon Kennedy <code@sffjunkie.co.uk>'
+__author__ = 'Simon Kennedy <sffjunkie+code@gmail.com>'
 
 ITUNES_9 = 208
 ITUNES_OLD = 216
